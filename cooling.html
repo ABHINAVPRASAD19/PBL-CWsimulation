@@ -1,0 +1,1130 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Newton's Dynamic Thermal Simulator</title>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;600;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        :root {
+            --text-dark: #2f3542;
+            --glass-bg: rgba(255, 255, 255, 0.85);
+            --glass-border: rgba(255, 255, 255, 0.6);
+        }
+
+        body { 
+            font-family: 'Outfit', sans-serif;  margin: 0; padding: 0;
+            min-height: 100vh; overflow-x: hidden; color: var(--text-dark);
+            background-size: 400% 400%; animation: bg-animation 15s ease infinite; transition: background 0.8s ease;
+        }
+
+        body.bg-menu { background: linear-gradient(90deg, #ff4500 10%, #6c5ce7 50%, #00d2ff 90%); background-size: 100% 100%; animation: none; color: white; }
+        body.bg-hot { background-image: linear-gradient(-45deg, #ff4757, #ff6b81, #ffa502, #ff7f50); }
+        body.bg-cold { background-image: linear-gradient(-45deg, #0984e3, #74b9ff, #00cec9, #81ecec); }
+
+        @keyframes bg-animation { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        @keyframes fade-up { from { opacity: 0; transform: translateY(40px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes fade-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes slide-down { from { opacity: 0; transform: translateY(-15px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* Floating particles */
+        #particles-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; pointer-events: none; z-index: 1; }
+        .particle { position: absolute; opacity: 0.4; }
+        
+        @keyframes float-snow {
+            0% { transform: translateY(-50px) translateX(0) rotate(0deg); opacity: 0; }
+            10% { opacity: 0.8; } 90% { opacity: 0.8; }
+            100% { transform: translateY(100vh) translateX(100px) rotate(360deg); opacity: 0; }
+        }
+        @keyframes float-ember {
+            0% { transform: translateY(0) translateX(0) scale(1.5); opacity: 0; }
+            10% { opacity: 0.9; } 90% { opacity: 0.9; }
+            100% { transform: translateY(-120vh) translateX(-100px) scale(0.5); opacity: 0; }
+        }
+
+        /* Transition Overlay */
+        .transition-overlay {
+            position: fixed; top: 50%; left: 50%; width: 50px; height: 50px;
+            pointer-events: none; z-index: 9999; transform: translate(-50%, -50%) scale(0); 
+            border-radius: 50%; opacity: 0;
+        }
+        .transition-overlay.animate-hot {
+            background: radial-gradient(circle, #ffa502 0%, #ff4757 60%, rgba(255,71,87,0) 100%);
+            animation: explode 1.5s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+        }
+        .transition-overlay.animate-cold {
+            background: radial-gradient(circle, #ffffff 0%, #00d2ff 60%, rgba(0,210,255,0) 100%);
+            animation: explode 1.5s cubic-bezier(0.7, 0, 0.3, 1) forwards;
+        }
+
+        @keyframes explode {
+            0% { transform: translate(-50%, -50%) scale(0); opacity: 1; }
+            50% { transform: translate(-50%, -50%) scale(100); opacity: 1; }
+            100% { transform: translate(-50%, -50%) scale(100); opacity: 0; }
+        }
+
+        /* Screen Layouts */
+        .screen { display: none; width: 100%; min-height: 100vh; position: relative; z-index: 10; padding: 40px; box-sizing: border-box; }
+        .screen.active { display: flex; flex-direction: column; align-items: center; justify-content: center; animation: fade-in 0.8s ease forwards; }
+
+        /* Menu Styles */
+        .menu-title { font-size: 50px; font-weight: 800; margin-bottom: 10px; text-shadow: 0 10px 20px rgba(0,0,0,0.3); text-align: center; }
+        .menu-subtitle { font-size: 20px; font-weight: 600; color: rgba(255,255,255,0.7); margin-bottom: 60px; text-align: center;}
+        
+        .menu-cards { display: flex; gap: 40px; flex-wrap: wrap; justify-content: center; }
+        .menu-card {
+            background: rgba(255,255,255,0.1); backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            border: 1px solid rgba(255,255,255,0.2); padding: 50px 30px; border-radius: 30px; 
+            cursor: pointer; text-align: center; width: 320px; color: white;
+            transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.2);
+        }
+        .menu-card:hover { transform: translateY(-15px) scale(1.05); background: rgba(255,255,255,0.15); }
+        .card-cold:hover { box-shadow: 0 30px 60px rgba(0, 210, 255, 0.4); border-color: rgba(0, 210, 255, 0.8); }
+        .card-hot:hover { box-shadow: 0 30px 60px rgba(255, 71, 87, 0.4); border-color: rgba(255, 71, 87, 0.8); }
+        
+        .card-icon { font-size: 80px; margin-bottom: 20px; text-shadow: 0 10px 20px rgba(0,0,0,0.2); animation: bounce 4s infinite ease-in-out; }
+        .card-hot .card-icon { animation-delay: 1s; }
+        @keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-15px); } }
+
+        /* Dashboard Styles */
+        .top-left-controls {
+            position: absolute; top: 40px; left: 40px; display: flex; flex-direction: column; gap: 15px; z-index: 100;
+        }
+
+        .back-btn {
+            background: var(--glass-bg); padding: 12px 24px; border-radius: 30px; font-weight: 800; 
+            cursor: pointer; color: var(--text-dark); border: 1px solid var(--glass-border); text-align: center;
+            box-shadow: 0 10px 20px rgba(0,0,0,0.1); transition: all 0.3s;
+        }
+        .back-btn:hover { padding-left: 18px; padding-right: 30px; background: white; transform: translateX(-5px); }
+
+        .mode-toggle {
+            display: flex; background: var(--glass-bg); padding: 5px; border-radius: 30px;
+            border: 1px solid var(--glass-border); box-shadow: 0 10px 20px rgba(0,0,0,0.1);
+            backdrop-filter: blur(10px); height: 35px; align-items: center; justify-content: center;
+        }
+        .toggle-option {
+            padding: 8px 16px; border-radius: 25px; cursor: pointer; font-weight: 800; font-size: 13px;
+            color: #57606f; transition: all 0.3s;
+        }
+        .toggle-option.active { background: #2f3542; color: white; box-shadow: 0 4px 10px rgba(0,0,0,0.2); }
+
+        .dashboard {
+            display: grid; grid-template-columns: 1fr 1fr; gap: 30px; width: 100%; max-width: 1200px;
+            margin-top: 60px;
+        }
+        @media (max-width: 900px) { 
+            .dashboard { grid-template-columns: 1fr; } 
+            .top-left-controls { position: static; top: 10px; left: 10px; margin-bottom: 20px; } 
+            .mode-toggle { flex-wrap: wrap; }
+        }
+
+        .panel {
+            background: var(--glass-bg); backdrop-filter: blur(25px); -webkit-backdrop-filter: blur(25px);
+            border: 1px solid var(--glass-border); padding: 40px; border-radius: 24px;
+            box-shadow: 0 25px 50px rgba(0,0,0,0.15), inset 0 0 0 1px rgba(255,255,255,0.9);
+            display: flex; flex-direction: column; animation: fade-up 0.8s forwards;
+        }
+
+        .chart-container {
+            background: var(--glass-bg); backdrop-filter: blur(25px); padding: 30px; border-radius: 24px;
+            display: flex; flex-direction: column; justify-content: center; animation: fade-up 0.8s forwards; animation-delay: 0.15s;
+            border: 1px solid var(--glass-border); box-shadow: 0 25px 50px rgba(0,0,0,0.15);
+        }
+
+        h1.panel-title { font-size: 32px; font-weight: 800; text-align: center; margin-top: 0; margin-bottom: 25px; }
+
+        .input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 15px; margin-bottom: 20px; }
+        .control-group { margin-bottom: 10px; }
+        label { display: flex; align-items: center; margin-bottom: 8px; font-weight: 600; font-size: 14px; color: #57606f; }
+        label i { margin-right: 6px; font-style: normal; font-size: 1.2em; }
+        
+        input { 
+            padding: 14px; width: 100%; box-sizing: border-box; border: 2px solid rgba(255,255,255,0.8); border-radius: 12px;
+            font-size: 16px; font-family: 'Outfit', sans-serif; background-color: rgba(255,255,255,0.5); font-weight: 600; color: var(--text-dark); transition: all 0.3s;
+        }
+        input:focus { outline: none; background-color: #fff; transform: translateY(-2px); border-color: #1e90ff; box-shadow: 0 0 0 4px rgba(30, 144, 255, 0.15); }
+
+        button.action-btn { 
+            color: white; border: none; padding: 18px 20px; border-radius: 12px; font-size: 16px; font-weight: 800; cursor: pointer; width: 100%;
+            transition: all 0.3s; text-transform: uppercase; letter-spacing: 1px; font-family: 'Outfit', sans-serif; margin-bottom: 12px; box-shadow: 0 8px 15px rgba(0,0,0,0.2);
+        }
+        button.action-btn:hover { transform: translateY(-3px) scale(1.02); box-shadow: 0 12px 25px rgba(0,0,0,0.3); }
+
+        .demo-output {
+            padding: 20px; background: rgba(255, 255, 255, 0.95); border-radius: 14px; display: none; margin-top: 15px;
+            font-size: 15px; line-height: 1.6; box-shadow: 0 8px 20px rgba(0,0,0,0.06); animation: slide-down 0.5s forwards;
+            border-left: 6px solid #2f3542;
+        }
+        
+        .chart-wrapper { position: relative; height: 350px; width: 100%; flex-grow: 1; }
+        details { margin-top: 15px; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px; border: 1px solid rgba(0,0,0,0.05); }
+        summary { font-weight: 800; cursor: pointer; color: #2f3542; user-select: none; }
+        .math-breakdown { margin-top: 12px; font-family: monospace; font-size: 0.95em; line-height: 1.6; color: #57606f; }
+
+        /* Side Drawer Styles */
+        .side-drawer {
+            position: fixed; top: 0; right: -450px; width: 400px; height: 100vh;
+            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            border-left: 1px solid var(--glass-border); z-index: 1000;
+            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 40px; box-sizing: border-box; box-shadow: -15px 0 35px rgba(0,0,0,0.15);
+        }
+        .side-drawer.open { right: 0; }
+        .drawer-close { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--text-dark); transition: transform 0.2s; }
+        .drawer-close:hover { transform: scale(1.1) rotate(90deg); color: #ff4757; }
+        .drawer-overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.3); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s; }
+        .drawer-overlay.active { display: block; opacity: 1; }
+        
+        /* Toast Notifications */
+        .toast-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; width: 350px; }
+        .toast {
+            background: #2f3542; color: white; padding: 15px 25px; border-radius: 12px;
+            font-weight: 600; box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+            animation: slide-up 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+            display: flex; align-items: center; gap: 15px; border-left: 5px solid #2ed573;
+            font-size: 15px; line-height: 1.4;
+        }
+        .toast.warning { border-left-color: #feca57; }
+        .toast.danger { border-left-color: #ff4757; }
+        @keyframes toast-fade-out { from { opacity: 1; transform: translateY(0); } to { opacity: 0; transform: translateY(20px); } }
+        /* Stopwatch Widget */
+        .sw-widget { position: fixed; bottom: 40px; right: 40px; width: 140px; height: 160px; z-index: 1000; display: none; transition: all 0.4s cubic-bezier(0.16, 1, 0.3, 1); transform: translateY(20px) scale(0.9); opacity: 0; color: #00d2ff; }
+        .sw-widget.active { display: block; transform: translateY(0) scale(1); opacity: 1; }
+        .sw-glass-bg { position: absolute; top: 15px; left: 0; width: 100%; height: 140px; background: rgba(0, 0, 0, 0.4); border-radius: 50%; backdrop-filter: blur(15px); -webkit-backdrop-filter: blur(15px); z-index: -1; box-shadow: 0 15px 35px rgba(0,0,0,0.3), inset 0 0 0 1px rgba(255,255,255,0.05); }
+        .sw-svg { width: 100%; height: 100%; filter: drop-shadow(0 0 8px currentColor); }
+        .sw-txt { position: absolute; top: 86px; left: 50%; transform: translate(-50%, -50%); text-align: center; text-shadow: 0 0 10px currentColor; width: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+        .sw-time { font-family: 'Outfit', sans-serif; font-weight: 300; font-size: 38px; letter-spacing: 1px; line-height: 1; border-bottom: 1px solid transparent; }
+        .sw-ms { font-family: 'Outfit', sans-serif; font-weight: 300; font-size: 14px; opacity: 0.8; margin-top: 2px; }
+    </style>
+</head>
+<body class="bg-menu">
+
+    <div id="particles-container"></div>
+    <div id="transition-overlay" class="transition-overlay"></div>
+
+    <!-- SIDE DRAWER & TOASTS -->
+    <div id="drawer-overlay" class="drawer-overlay"></div>
+    <div id="side-drawer" class="side-drawer">
+        <div class="drawer-close" onclick="toggleDrawer()">✕</div>
+        <h2 style="margin-top: 0; font-size: 28px;">Real-World Apps</h2>
+        <p style="color: #57606f; font-weight: 500; font-size: 14px; margin-bottom: 25px;">Select a scenario to track optimal temperature thresholds dynamically.</p>
+        
+        <div class="mode-toggle" style="margin-bottom: 25px;">
+            <div class="toggle-option active" id="type-food" onclick="setDrawerType('food')">🍔 Drink/Food</div>
+            <div class="toggle-option" id="type-metal" onclick="setDrawerType('metal')">⚙️ Industrial</div>
+        </div>
+
+        <div class="control-group">
+            <label><i>📋</i> Scenario Preset</label>
+            <select id="scenario-preset" style="padding: 14px; width: 100%; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 16px; font-family: 'Outfit', sans-serif; background-color: rgba(255,255,255,0.8); font-weight: 600; color: var(--text-dark); outline:none; transition: all 0.3s; cursor: pointer;">
+            </select>
+        </div>
+        
+        <div style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 16px; margin-top: 30px; border: 1px solid rgba(0,0,0,0.05);">
+            <h3 style="margin-top:0; font-size: 18px; display: flex; align-items: center; gap: 8px;">🎯 Goldilocks Zone</h3>
+            <p id="zone-description" style="font-size: 14px; color: #57606f; margin-bottom: 5px; font-weight: 600;">Optimal Temp: 60°C - 50°C</p>
+            <p style="font-size: 13px; color: #a4b0be; margin-top: 0;">We'll calculate when it enters and exits this zone.</p>
+            
+            <div style="display: flex; gap: 10px; align-items: center; margin-top: 20px; margin-bottom: 10px;">
+                <input type="checkbox" id="fast-forward" checked style="width: 20px; height: 20px; cursor: pointer;">
+                <label for="fast-forward" style="margin-bottom:0; cursor: pointer; font-size: 14px; font-weight: 800;">Accelerate Time for Demo (60x)</label>
+            </div>
+            
+            <p id="preset-hint" style="font-size: 11px; color: #a4b0be; margin-top: 0; margin-bottom: 15px; cursor: pointer; text-decoration: underline;" onclick="loadManualPresets()">💡 Click to load recommended temperatures for this scenario</p>
+            
+            <button id="start-tracking-btn" class="action-btn" style="background: linear-gradient(135deg, #2f3542, #57606f); margin-top: 5px; margin-bottom: 0;">🚀 Start Live Tracking</button>
+        </div>
+    </div>
+    <div id="stopwatch-container" class="sw-widget">
+        <div class="sw-glass-bg"></div>
+        <svg viewBox="0 0 100 115" class="sw-svg">
+            <rect x="42" y="2" width="16" height="3" rx="1.5" fill="currentColor"/>
+            <rect x="46" y="5" width="8" height="3" fill="currentColor"/>
+            <polygon points="26,14 24,16 30,22 32,20" fill="currentColor"/>
+            <rect x="22" y="11" width="8" height="2" rx="1" transform="rotate(45 25 13)" fill="currentColor"/>
+            <circle cx="50" cy="62" r="46" fill="none" stroke="currentColor" stroke-width="1.5" stroke-dasharray="1 6" opacity="0.6"/>
+            <circle cx="50" cy="62" r="41" fill="none" stroke="currentColor" stroke-width="0.5" opacity="0.3"/>
+            <circle id="stopwatch-progress" cx="50" cy="62" r="41" fill="none" stroke="currentColor" stroke-width="2.5" stroke-dasharray="257.6" stroke-dashoffset="257.6" stroke-linecap="round" transform="rotate(-90 50 62)"/>
+        </svg>
+        <div class="sw-txt">
+            <div id="stopwatch-time" class="sw-time">00</div>
+            <div id="stopwatch-ms" class="sw-ms">.00</div>
+        </div>
+    </div>
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- MAIN MENU -->
+    <div id="screen-menu" class="screen active">
+        <h1 class="menu-title">Newton's Thermal Environments</h1>
+        <p class="menu-subtitle">Select your physical scenario to initialize the simulation engine.</p>
+        
+        <div class="menu-cards">
+            <div class="menu-card card-hot" onclick="selectMode('hot')">
+                <div class="card-icon">🔥</div>
+                <h2 style="margin-top:0;">Cooling Simulator</h2>
+                <p>Hot Object → Room Temperature</p>
+            </div>
+            <div class="menu-card card-cold" onclick="selectMode('cold')">
+                <div class="card-icon">❄️</div>
+                <h2 style="margin-top:0;">Warming Simulator</h2>
+                <p>Frozen Object → Room Temperature</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- SIMULATOR DASHBOARD -->
+    <div id="screen-simulator" class="screen">
+        <div class="top-left-controls">
+            <div class="back-btn" onclick="goBack()">← Main Menu</div>
+            <div style="display: flex; gap: 15px; flex-wrap: wrap;">
+                <div class="mode-toggle">
+                    <div class="toggle-option active" id="toggle-manual" onclick="setEntryMode('manual')">🧮 Manual Entry</div>
+                    <div class="toggle-option" id="toggle-arduino" onclick="setEntryMode('arduino')">🔌 Arduino Live</div>
+                </div>
+                <div class="mode-toggle">
+                    <div class="toggle-option active" id="toggle-c" onclick="setUnitMode('C')">🌡️ °C (Celsius)</div>
+                    <div class="toggle-option" id="toggle-k" onclick="setUnitMode('K')">🔬 K (Kelvin)</div>
+                </div>
+            </div>
+        </div>
+        <div class="top-right-controls" style="position: absolute; top: 40px; right: 40px; z-index: 100;">
+            <div class="back-btn" onclick="toggleDrawer()" style="background: #2f3542; color: white;">☰ More</div>
+        </div>
+        
+        <div class="dashboard">
+            <div class="panel" id="dynamic-panel" style="border-top: 6px solid #2f3542;">
+                <h1 class="panel-title" id="panel-title-text">...</h1>
+                
+                <div class="input-grid">
+                    <div class="control-group" id="wrapper-init">
+                        <label id="lbl-init"><i>🌡️</i> Initial Temp (°C)</label>
+                        <input type="number" id="input-init" step="0.1">
+                    </div>
+                    <div class="control-group" id="wrapper-env">
+                        <label style="display: flex; justify-content: space-between; align-items: center;">
+                            <span><i>🌍</i> Ambient Temp (°C)</span>
+                            <span id="auto-detect-btn" title="Auto-detect location" style="cursor: pointer; opacity: 0.7; font-size: 1.2em; transition: all 0.3s;" onclick="fetchAmbientTemperature()">📍</span>
+                        </label>
+                        <input type="number" id="input-env" step="0.1" value="30.0">
+                    </div>
+                    <div class="control-group" id="wrapper-target">
+                        <label><i>🎯</i> Target Temp (°C)</label>
+                        <input type="number" id="input-target" step="0.1">
+                    </div>
+                    <div class="control-group">
+                        <label><i>📉</i> Thermal Const. (k)</label>
+                        <input type="number" id="input-k" step="0.01" value="0.05">
+                    </div>
+                </div>
+
+                <div style="display: flex; flex-direction: column; gap: 10px; margin-top: 10px;">
+                    <button id="calc-btn" class="action-btn">🧮 Calculate Timer</button>
+                    <button id="connect-btn" class="action-btn" style="display:none; background: linear-gradient(135deg, #2ed573, #1e90ff);">🔌 Connect Arduino Port</button>
+                </div>
+
+                <div id="demo-output" class="demo-output"></div>
+            </div>
+
+            <div class="chart-container">
+                <h2 style="margin-top:0; color:#2f3542; text-align:center;">📈 Real-Time Trajectory</h2>
+                <div class="chart-wrapper">
+                    <canvas id="coolingChart"></canvas>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // ---- Audio Engine Synthesizer ----
+        const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+        
+        function playClickSound() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const playBellFreq = (freq, delay) => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + delay + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 1.0);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + delay); osc.stop(audioCtx.currentTime + delay + 1.0);
+            };
+            playBellFreq(1046.50, 0); // Quick high bell C6
+            playBellFreq(1318.51, 0.08); // Quick higher bell E6
+        }
+        
+        function playWooshSound(type) {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            const playBellFreq = (freq, delay) => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + delay + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + delay + 1.5);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + delay); osc.stop(audioCtx.currentTime + delay + 1.5);
+            };
+
+            if (type === 'hot') {
+                // Majestic, bold "Achievement" Bell Chord for Fire
+                playBellFreq(523.25, 0);    
+                playBellFreq(659.25, 0.05); 
+                playBellFreq(783.99, 0.1);  
+                playBellFreq(987.77, 0.15); 
+            } else {
+                // Shimmering, magical "Achievement" Bell Chord for Ice
+                playBellFreq(880.00, 0);    
+                playBellFreq(1046.50, 0.05);
+                playBellFreq(1318.51, 0.1); 
+                playBellFreq(1567.98, 0.15);
+                playBellFreq(1975.53, 0.2); 
+            }
+        }
+        
+        function playSuccessSound() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const playNote = (freq, delay) => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = freq;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime + delay); gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + delay + 0.05); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.5);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime + delay); osc.stop(audioCtx.currentTime + delay + 0.5);
+            };
+            playNote(523.25, 0); // C5
+            playNote(659.25, 0.1); // E5
+            playNote(783.99, 0.2); // G5
+        }
+
+        // ---- Toast & Drawer Logic ----
+        function showToast(msg, type='success', icon='✅') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.innerHTML = `<span style="font-size:24px;">${icon}</span> <span>${msg}</span>`;
+            container.appendChild(toast);
+            
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            
+            if(type==='success') playSuccessSound();
+            if(type==='warning') {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = 400;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + 0.1); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.3);
+            }
+            if(type==='danger') {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sawtooth'; osc.frequency.value = 200;
+                gain.gain.setValueAtTime(0, audioCtx.currentTime); gain.gain.linearRampToValueAtTime(0.4, audioCtx.currentTime + 0.1); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+                osc.connect(gain); gain.connect(audioCtx.destination); osc.start(audioCtx.currentTime); osc.stop(audioCtx.currentTime + 0.6);
+            }
+
+            setTimeout(() => {
+                toast.style.animation = 'toast-fade-out 0.4s forwards';
+                setTimeout(() => toast.remove(), 400);
+            }, 6000);
+        }
+
+        function toggleDrawer() {
+            playClickSound();
+            const drw = document.getElementById('side-drawer');
+            const ovr = document.getElementById('drawer-overlay');
+            if (drw.classList.contains('open')) {
+                drw.classList.remove('open');
+                ovr.classList.remove('active');
+            } else {
+                drw.classList.add('open');
+                ovr.classList.add('active');
+                setDrawerType(document.getElementById('type-food').classList.contains('active') ? 'food' : 'metal');
+            }
+        }
+        document.getElementById('drawer-overlay').addEventListener('click', toggleDrawer);
+
+        const scenarios = {
+            'hot': {
+                'food': [
+                    { id: 'coffee', name: '☕ Hot Coffee Tracking', tInit: 90, tEnv: 22, k: 0.04, minT: 50, maxT: 60, desc: 'Optimal Drinking Range: 60°C to 50°C' },
+                    { id: 'water', name: '💧 Boiling Water Cooling', tInit: 100, tEnv: 22, k: 0.05, minT: 30, maxT: 40, desc: 'Safe Handling Range: 40°C to 30°C' },
+                    { id: 'tea', name: '🍵 Herbal Tea Steeping', tInit: 95, tEnv: 22, k: 0.035, minT: 65, maxT: 75, desc: 'Flavor Zone: 75°C to 65°C' }
+                ],
+                'metal': [
+                    { id: 'steel', name: '⚒️ Steel Quenching', tInit: 900, tEnv: 25, k: 0.15, minT: 50, maxT: 100, desc: 'Safe Touch Handling: 100°C to 50°C' },
+                    { id: 'cpu', name: '💻 CPU Cooling (Air)', tInit: 85, tEnv: 24, k: 0.6, minT: 35, maxT: 45, desc: 'Safe Idle Temps: 45°C to 35°C' }
+                ]
+            },
+            'cold': {
+                'food': [
+                    { id: 'ice', name: '🧊 Ice Cube Melting', tInit: -15, tEnv: 25, k: 0.04, minT: 0, maxT: -5, desc: 'Keep ice solid (Melts past 0°C)' },
+                    { id: 'popsicle', name: '🍦 Popsicle Thawing', tInit: -18, tEnv: 22, k: 0.03, minT: -2, maxT: -6, desc: 'Perfect frozen bite phase' },
+                    { id: 'meat', name: '🥩 Frozen Meat Defrost', tInit: -18, tEnv: 22, k: 0.02, minT: 0, maxT: -5, desc: 'Safe fridge thaw zone' }
+                ],
+                'metal': [
+                    { id: 'nitrogen', name: '❄️ Liquid N2 Warmed', tInit: -196, tEnv: 25, k: 0.4, minT: -60, maxT: -100, desc: 'Extreme Cold hazard zone' },
+                    { id: 'satellite', name: '🛰️ Satellite Re-entry', tInit: -150, tEnv: 1000, k: 0.08, minT: 0, maxT: -50, desc: 'Frost burn phase' }
+                ]
+            }
+        };
+
+        let currentScenario = null;
+        function setDrawerType(type) {
+            playClickSound();
+            document.getElementById('type-food').classList.toggle('active', type === 'food');
+            document.getElementById('type-metal').classList.toggle('active', type === 'metal');
+            
+            const sel = document.getElementById('scenario-preset');
+            sel.innerHTML = '';
+            
+            const list = scenarios[currentMode][type];
+            list.forEach(s => {
+                let opt = document.createElement('option');
+                opt.value = s.id; opt.innerHTML = s.name;
+                sel.appendChild(opt);
+            });
+            applyScenario(list[0]);
+        }
+        
+        function applyScenario(s) {
+            currentScenario = s;
+            // Only update the technical constant and the visual description
+            // Do NOT overwrite user-entered temperatures (T-Init, T-Env, T-Target)
+            document.getElementById('input-k').value = s.k;
+            document.getElementById('zone-description').innerHTML = s.desc;
+            
+            // Highlight that presets are available
+            const hint = document.getElementById('preset-hint');
+            hint.style.color = '#1e90ff';
+            setTimeout(() => hint.style.color = '#a4b0be', 2000);
+        }
+
+        function loadManualPresets() {
+            if(!currentScenario) return;
+            playClickSound();
+            document.getElementById('input-init').value = currentScenario.tInit;
+            document.getElementById('input-env').value = currentUnit === 'C' ? currentScenario.tEnv : (currentScenario.tEnv + 273.15).toFixed(1);
+            document.getElementById('input-target').value = currentUnit === 'C' ? currentScenario.minT : (currentScenario.minT + 273.15).toFixed(1);
+            showToast("Presets Loaded!", "success", "🧼");
+        }
+
+        document.getElementById('scenario-preset').addEventListener('change', (e) => {
+            const type = document.getElementById('type-food').classList.contains('active') ? 'food' : 'metal';
+            const s = scenarios[currentMode][type].find(x => x.id === e.target.value);
+            if(s) applyScenario(s);
+        });
+
+        let stopwatchInterval = null;
+        let stopwatchStartTime = null;
+        let phase3FadeoutTimeout = null;
+
+        function startStopwatch(speedFactor, msStart, msEnd) {
+            const container = document.getElementById('stopwatch-container');
+            const timeDisplay = document.getElementById('stopwatch-time');
+            const msDisplay = document.getElementById('stopwatch-ms');
+            const progressCircle = document.getElementById('stopwatch-progress');
+            
+            const activeColor = currentMode === 'hot' ? '#ff4757' : '#00d2ff';
+            
+            container.style.display = 'block';
+            void container.offsetWidth; // Force reflow
+            container.classList.add('active');
+            
+            clearInterval(stopwatchInterval);
+            stopwatchStartTime = Date.now();
+            clearTimeout(phase3FadeoutTimeout);
+            
+            let phase2Triggered = false;
+            let phase3Triggered = false;
+            
+            stopwatchInterval = setInterval(() => {
+                const now = Date.now();
+                const realElapsed = now - stopwatchStartTime;
+                
+                let displayMs = 0;
+                let progressPct = 0;
+
+                if (realElapsed < msStart) {
+                    // PHASE 1: Counting UP to optimal temp (msStart)
+                    container.style.color = activeColor;
+                    displayMs = realElapsed * speedFactor;
+                    progressPct = realElapsed / msStart;
+                    progressCircle.style.strokeDashoffset = 257.6 - (257.6 * progressPct);
+                } 
+                else if (realElapsed >= msStart && realElapsed <= msEnd) {
+                    // PHASE 2: Counting DOWN the Goldilocks zone
+                    if (!phase2Triggered) {
+                        phase2Triggered = true;
+                        container.style.transform = 'scale(1.15)'; // Add pop effect
+                        setTimeout(() => container.style.transform = 'scale(1)', 300);
+                    }
+                    container.style.color = '#2ed573'; // Emerald Green
+                    const timeLeft = msEnd - realElapsed;
+                    displayMs = Math.max(0, timeLeft * speedFactor);
+                    progressPct = timeLeft / (msEnd - msStart); // drains from 1 -> 0
+                    progressCircle.style.strokeDashoffset = 257.6 - (257.6 * progressPct);
+                } 
+                else {
+                    // PHASE 3: Done (Cold/Undrinkable)
+                    clearInterval(stopwatchInterval);
+                    container.style.color = '#a4b0be'; // Grey out
+                    displayMs = 0;
+                    progressCircle.style.strokeDashoffset = 257.6; // Empty
+                    
+                    if (!phase3Triggered) {
+                        phase3Triggered = true;
+                        phase3FadeoutTimeout = setTimeout(() => {
+                            container.classList.remove('active');
+                            setTimeout(() => container.style.display = 'none', 400);
+                        }, 10000);
+                    }
+                }
+                
+                const totalSeconds = displayMs / 1000;
+                const mm = Math.floor(totalSeconds / 60);
+                const ss = Math.floor(totalSeconds % 60);
+                const msStr = Math.floor((displayMs % 1000) / 10).toString().padStart(2, '0');
+                
+                if (mm > 0) {
+                    timeDisplay.innerText = `${mm}:${ss.toString().padStart(2, '0')}`;
+                } else {
+                    timeDisplay.innerText = ss.toString().padStart(2, '0');
+                }
+                msDisplay.innerText = `.${msStr}`;
+            }, 30);
+        }
+
+        let trackingTimers = [];
+        document.getElementById('start-tracking-btn').addEventListener('click', () => {
+            if(!currentScenario) return;
+            
+            // Trigger calculation on dashboard
+            document.getElementById('calc-btn').click();
+            toggleDrawer(); // close drawer
+            
+            // Clear existing trackers
+            trackingTimers.forEach(t => clearTimeout(t)); trackingTimers = [];
+            
+            const tInit = parseFloat(document.getElementById('input-init').value);
+            const tEnv = parseFloat(document.getElementById('input-env').value);
+            const tTargetMan = parseFloat(document.getElementById('input-target').value);
+            const k = parseFloat(document.getElementById('input-k').value);
+            
+            // Math: Time to reach boundaries (User manual target is the absolute end)
+            // Use scenario's 'maxT' (optimal start) if suitable, otherwise calculate a 20% progress point
+            const delta = Math.abs(tInit - tTargetMan);
+            const tStartIdealVal = currentScenario ? currentScenario.maxT : (tInit - (delta * 0.7)); 
+            
+            const tStartIdeal = calculateTimeForTarget(tStartIdealVal, tInit, tEnv, k);
+            const tEndIdeal = calculateTimeForTarget(tTargetMan, tInit, tEnv, k);
+            
+            if(tStartIdeal < 0 || tEndIdeal < 0) {
+                showToast("Scenario physically unreachable with current parameters.", "danger", "⚠️");
+                return;
+            }
+
+            const speedFactor = document.getElementById('fast-forward').checked ? 60 : 1;
+            const msStart = (tStartIdeal * 60 * 1000) / speedFactor;
+            const msEnd = (tEndIdeal * 60 * 1000) / speedFactor;
+            const msDuration = msEnd - msStart;
+
+            startStopwatch(speedFactor, msStart, msEnd);
+
+            showToast(`Tracking Initiated! Will notify when temperature hits ${tStartIdealVal}°${currentUnit}.`, 'success', '📡');
+
+            trackingTimers.push(setTimeout(() => {
+                showToast(`Optimal Temp Reached (${tStartIdealVal}°${currentUnit})! Target: ${tTargetMan}°${currentUnit}.`, 'success', '✨');
+            }, msStart));
+
+            if (msDuration > 4000) { // Only show midpoint if duration is long enough
+                trackingTimers.push(setTimeout(() => {
+                    showToast(`Hurry up! Temperature is dropping out of optimal range!`, 'warning', '⏳');
+                }, msStart + (msDuration / 2)));
+            }
+
+            trackingTimers.push(setTimeout(() => {
+                showToast(`Hurry up, last chance! Nearing ${tTargetMan}°${currentUnit} threshold!`, 'danger', '🔥');
+            }, Math.max(msStart + 1000, msEnd - (10000 / speedFactor)))); // 10 real seconds before end, or at least 1s after start
+        });
+
+        let currentMode = 'hot';
+        let entryMode = 'manual';
+        let currentUnit = 'C';
+        let simulationChart = null;
+        let particleInterval = null;
+
+        function setUnitMode(unit) {
+            if (currentUnit === unit) return;
+            playClickSound();
+            const oldUnit = currentUnit;
+            currentUnit = unit;
+            
+            document.getElementById('toggle-c').classList.toggle('active', unit === 'C');
+            document.getElementById('toggle-k').classList.toggle('active', unit === 'K');
+
+            document.getElementById('lbl-init').innerHTML = `<i>🌡️</i> Initial Temp (&#176;${unit === 'C' ? 'C' : 'K'})`;
+            document.querySelector('#wrapper-env label').innerHTML = `<i>🌍</i> Ambient Temp (&#176;${unit === 'C' ? 'C' : 'K'})`;
+            document.querySelector('#wrapper-target label').innerHTML = `<i>🎯</i> Target Temp (&#176;${unit === 'C' ? 'C' : 'K'})`;
+
+            ['input-init', 'input-env', 'input-target'].forEach(id => {
+                const el = document.getElementById(id);
+                if (el.value !== '') {
+                    let val = parseFloat(el.value);
+                    if (unit === 'K' && oldUnit === 'C') val = val + 273.15;
+                    if (unit === 'C' && oldUnit === 'K') val = val - 273.15;
+                    el.value = val.toFixed(1);
+                }
+            });
+
+            if (currentMode === 'hot') document.getElementById('lbl-init').innerHTML = `<i>☕</i> Boiling Initial Temp (&#176;${unit === 'C' ? 'C' : 'K'})`;
+            else document.getElementById('lbl-init').innerHTML = `<i>🧊</i> Frozen Initial Temp (&#176;${unit === 'C' ? 'C' : 'K'})`;
+
+            document.getElementById('demo-output').style.display = 'none';
+            if(simulationChart) simulationChart.destroy();
+        }
+
+        // ---- UI Transitions ----
+        function selectMode(mode) {
+            playWooshSound(mode);
+            currentMode = mode;
+            const overlay = document.getElementById('transition-overlay');
+            const menuScreen = document.getElementById('screen-menu');
+            const simScreen = document.getElementById('screen-simulator');
+            
+            // 1. Kick off explosion animation
+            overlay.className = 'transition-overlay animate-' + mode;
+            
+            // 2. Mid explosion (750ms), swap body gradients and HTML
+            setTimeout(() => {
+                document.body.className = 'bg-' + mode;
+                menuScreen.classList.remove('active');
+                simScreen.classList.add('active');
+                
+                setupDashboard(mode);
+                setEntryMode(entryMode);
+                spawnParticles(mode);
+
+            }, 750);
+
+            // 3. Clear explosion class to reset
+            setTimeout(() => {
+                overlay.className = 'transition-overlay';
+            }, 1500);
+        }
+
+        function goBack() {
+            playClickSound();
+            document.body.className = 'bg-menu';
+            document.getElementById('screen-simulator').classList.remove('active');
+            document.getElementById('screen-menu').classList.add('active');
+            spawnMainMenuParticles();
+            
+            clearInterval(stopwatchInterval);
+            clearTimeout(phase3FadeoutTimeout);
+            const swContainer = document.getElementById('stopwatch-container');
+            if(swContainer) {
+                swContainer.classList.remove('active');
+                setTimeout(() => swContainer.style.display = 'none', 400);
+            }
+        }
+
+        function setEntryMode(mode) {
+            if (entryMode !== mode) playClickSound();
+            entryMode = mode;
+            document.getElementById('toggle-manual').classList.toggle('active', mode === 'manual');
+            document.getElementById('toggle-arduino').classList.toggle('active', mode === 'arduino');
+
+            const wrapInit = document.getElementById('wrapper-init');
+            const wrapEnv = document.getElementById('wrapper-env');
+            const btnCalc = document.getElementById('calc-btn');
+            const btnConn = document.getElementById('connect-btn');
+            const outBox = document.getElementById('demo-output');
+
+            if (mode === 'arduino') {
+                wrapInit.style.opacity = '0.3'; wrapInit.style.pointerEvents = 'none';
+                wrapEnv.style.opacity = '0.3'; wrapEnv.style.pointerEvents = 'none';
+                btnCalc.style.display = 'none';
+                btnConn.style.display = 'block';
+                outBox.style.display = 'none'; 
+            } else {
+                wrapInit.style.opacity = '1'; wrapInit.style.pointerEvents = 'auto';
+                wrapEnv.style.opacity = '1'; wrapEnv.style.pointerEvents = 'auto';
+                btnCalc.style.display = 'block';
+                btnConn.style.display = 'none';
+                outBox.style.display = 'none'; 
+            }
+        }
+
+        // ---- Particle Generator Engine (Dyno Sync) ----
+        let mainMenuParticleInterval = null;
+        function spawnMainMenuParticles() {
+            clearInterval(particleInterval);
+            clearInterval(mainMenuParticleInterval);
+            const container = document.getElementById('particles-container');
+            container.innerHTML = '';
+            
+            const createMulti = () => {
+                let e = document.createElement('div'); e.className = 'particle'; e.style.position = 'absolute'; e.innerHTML = '🔥';
+                e.style.left = (Math.random() * 40 + 5) + 'vw'; e.style.top = '100vh'; e.style.fontSize = (Math.random() * 15 + 15) + 'px';
+                let et = Math.random() * 4 + 6; e.style.animation = `float-ember ${et}s linear forwards`;
+                container.appendChild(e); setTimeout(() => e.remove(), et * 1000 + 100);
+
+                let s = document.createElement('div'); s.className = 'particle'; s.style.position = 'absolute'; s.innerHTML = '❄️';
+                s.style.left = (Math.random() * 40 + 55) + 'vw'; s.style.top = '-50px'; s.style.fontSize = (Math.random() * 15 + 10) + 'px';
+                let st = Math.random() * 5 + 7; s.style.animation = `float-snow ${st}s linear forwards`;
+                container.appendChild(s); setTimeout(() => s.remove(), st * 1000 + 100);
+            };
+            for(let i=0; i<8; i++) setTimeout(createMulti, Math.random()*2000);
+            mainMenuParticleInterval = setInterval(createMulti, 1200);
+        }
+        
+        // Initialize menu particles immediately on script load
+        setTimeout(spawnMainMenuParticles, 100);
+
+        function spawnParticles(mode, tempDelta = 70) {
+            clearInterval(mainMenuParticleInterval);
+            clearInterval(particleInterval);
+            const container = document.getElementById('particles-container');
+            container.innerHTML = ''; // Clear existing particles
+
+            // Normalize delta to an intensity multiplier (Base 70 delta = 1.0x intensity)
+            // Range capped between 0.3x (very calm) and 3.5x (raging inferno/blizzard)
+            let rawIntensity = tempDelta / 70;
+            let intensity = Math.max(0.3, Math.min(rawIntensity, 3.5));
+
+            const spawnRate = 800 / intensity;
+            
+            const createParticle = () => {
+                let p = document.createElement('div');
+                p.className = 'particle';
+                p.style.position = 'absolute';
+                
+                if (mode === 'cold') {
+                    p.innerHTML = '❄️';
+                    p.style.left = (Math.random() * 100) + 'vw'; p.style.top = -50 + 'px';
+                    p.style.fontSize = (Math.random() * 15 + 10) + 'px';
+                    // Faster fall time based on intensity
+                    let animTime = (Math.random() * 5 + 6) / Math.sqrt(intensity); 
+                    p.style.animation = `float-snow ${animTime}s linear forwards`;
+                    
+                    container.appendChild(p);
+                    setTimeout(() => p.remove(), animTime * 1000 + 100);
+                } else {
+                    p.innerHTML = '🔥';
+                    p.style.left = (Math.random() * 100) + 'vw'; p.style.top = '100vh';
+                    p.style.fontSize = (Math.random() * 15 * Math.min(intensity, 1.5) + 15) + 'px'; // Embers physically grow in roaring fires
+                    let animTime = (Math.random() * 4 + 4) / Math.sqrt(intensity);
+                    p.style.animation = `float-ember ${animTime}s linear forwards`;
+                    
+                    container.appendChild(p);
+                    setTimeout(() => p.remove(), animTime * 1000 + 100);
+                }
+            };
+
+            // Explode a burst of initial particles based on new intensity level
+            for(let i=0; i < 8 * intensity; i++) setTimeout(createParticle, Math.random() * 800);
+            
+            // Keep rhythmic spawning synchronized to intensity stream
+            particleInterval = setInterval(createParticle, spawnRate);
+        }
+
+        // ---- Dashboard Setup ----
+        function setupDashboard(mode) {
+            const panel = document.getElementById('dynamic-panel');
+            const title = document.getElementById('panel-title-text');
+            const lblInit = document.getElementById('lbl-init');
+            const inInit = document.getElementById('input-init');
+            const inTarget = document.getElementById('input-target');
+            const btnCalc = document.getElementById('calc-btn');
+            const outDiv = document.getElementById('demo-output');
+            
+            Chart.defaults.animation = false; // Disable initial chart anim
+            outDiv.style.display = 'none';
+
+            const unitStr = currentUnit === 'C' ? 'C' : 'K';
+            if (mode === 'hot') {
+                panel.style.borderTopColor = '#ff4757';
+                title.innerHTML = '🔥 Heat Sink Simulator';
+                lblInit.innerHTML = `<i>☕</i> Boiling Initial Temp (&#176;${unitStr})`;
+                inInit.value = currentUnit === 'C' ? '90.0' : '363.1';
+                document.getElementById('input-env').value = currentUnit === 'C' ? '30.0' : '303.1';
+                inTarget.value = currentUnit === 'C' ? '35.0' : '308.1';
+                
+                btnCalc.style.background = 'linear-gradient(135deg, #ff416c, #ff4b2b)';
+                btnCalc.innerHTML = '🧮 Compute Cooling Duration';
+                
+                drawChart(parseFloat(inInit.value), parseFloat(document.getElementById('input-env').value), parseFloat(inTarget.value), 0.05, 62.42, 'hot');
+            } else {
+                panel.style.borderTopColor = '#00d2ff';
+                title.innerHTML = '❄️ Defrost Simulator';
+                lblInit.innerHTML = `<i>🧊</i> Frozen Initial Temp (&#176;${unitStr})`;
+                inInit.value = currentUnit === 'C' ? '-10.0' : '263.1';
+                document.getElementById('input-env').value = currentUnit === 'C' ? '30.0' : '303.1';
+                inTarget.value = currentUnit === 'C' ? '35.0' : '308.1';
+
+                btnCalc.style.background = 'linear-gradient(135deg, #00d2ff, #3a7bd5)';
+                btnCalc.innerHTML = '🧮 Compute Warming Duration';
+                
+                drawChart(parseFloat(inInit.value), parseFloat(document.getElementById('input-env').value), parseFloat(inTarget.value), 0.05, 36.97, 'cold');
+            }
+            Chart.defaults.animation = true;
+        }
+
+        // ---- Math Engine ----
+        function calcTemp(tInit, tEnv, k, t) { return tEnv + (tInit - tEnv) * Math.exp(-k * t); }
+
+        function calculateTimeForTarget(tTarget, tInit, tEnv, k) {
+            if (tInit === tEnv) return 0;
+            const ratio = (tTarget - tEnv) / (tInit - tEnv);
+            if (ratio <= 0) return -1; 
+            return -Math.log(ratio) / k;
+        }
+
+        document.getElementById('calc-btn').addEventListener('click', () => {
+            playSuccessSound();
+            const tInit = parseFloat(document.getElementById('input-init').value);
+            const tEnv = parseFloat(document.getElementById('input-env').value);
+            const tTarget = parseFloat(document.getElementById('input-target').value);
+            const k = parseFloat(document.getElementById('input-k').value);
+            const out = document.getElementById('demo-output');
+            
+            out.style.display = 'none'; // reset for entry anim
+            setTimeout(() => out.style.display = 'block', 10);
+
+            if (isNaN(tInit) || isNaN(tEnv) || isNaN(tTarget) || isNaN(k)) {
+                out.style.borderLeftColor = 'red';
+                out.innerHTML = '<span style="color:red;font-weight:bold;">⚠️ Missing parameters.</span>'; return;
+            }
+
+            // Smart physical constraint checking based on mode
+            if (currentMode === 'hot') {
+                if (tInit <= tEnv) { out.style.borderLeftColor='red'; out.innerHTML='<span style="color:red;font-weight:bold;">⚠️ Cooling Error: Initial temp must be hotter than ambient.</span>'; return; }
+                if (tTarget <= tEnv || tTarget >= tInit) { out.style.borderLeftColor='red'; out.innerHTML='<span style="color:red;font-weight:bold;">⚠️ Math Error: Target bounds physically unreachable.</span>'; return; }
+            } else {
+                if (tInit >= tEnv) { out.style.borderLeftColor='red'; out.innerHTML='<span style="color:red;font-weight:bold;">⚠️ Warming Error: Initial temp must be colder than ambient.</span>'; return; }
+                if (tTarget >= tEnv || tTarget <= tInit) { out.style.borderLeftColor='red'; out.innerHTML='<span style="color:red;font-weight:bold;">⚠️ Math Error: Target bounds physically unreachable.</span>'; return; }
+            }
+
+            const timeReq = calculateTimeForTarget(tTarget, tInit, tEnv, k);
+            const ratio = (tTarget - tEnv) / (tInit - tEnv);
+            
+            // Sync particle environment to the immense scale of the temperature calculation!
+            const delta = Math.abs(tInit - tEnv);
+            spawnParticles(currentMode, delta);
+
+            const actColor = currentMode === 'hot' ? '#ff4757' : '#00d2ff';
+            out.style.borderLeftColor = actColor;
+            
+            const timeHrsStr = timeReq >= 60 ? `<br><span style="color:#747d8c;">≈ ${(timeReq/60).toFixed(2)} Hours</span>` : '';
+            
+            out.innerHTML = `
+                <strong style="color: ${actColor};">✅ Trajectory Validated</strong><br><br>
+                <i>${currentMode==='hot' ? 'Cooling' : 'Warming'} ${tInit}&#176;${currentUnit} → ${tTarget}&#176;${currentUnit}</i><br>
+                Time Requirements: <b id="time-counter" style="font-size: 1.3em; color: ${actColor};">0m 0s</b>
+                
+                <details style="margin-top: 15px; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 8px;">
+                    <summary style="font-weight: bold; cursor: pointer; color: #2f3542;">📐 Source Equations</summary>
+                    <div style="margin-top: 10px; font-family: monospace; font-size: 0.9em; color: #57606f;">
+                        Target = ${tEnv} + (${tInit} - ${tEnv}) * e^(-${k}*t)<br>
+                        ${ratio.toFixed(4)} = e^(-${k}*t)<br>
+                        ln(${ratio.toFixed(4)}) = -${k} * t<br>
+                        t = ${timeReq.toFixed(2)} Minutes ${timeHrsStr}
+                    </div>
+                </details>
+            `;
+            
+            animateTimeCounter('time-counter', timeReq);
+            drawChart(tInit, tEnv, tTarget, k, timeReq, currentMode);
+        });
+
+        // ---- Animation Engies ----
+        function animateTimeCounter(id, totalTime) {
+            const obj = document.getElementById(id);
+            let start = null;
+            const step = (ts) => {
+                if(!start) start = ts;
+                let prog = Math.min((ts - start)/1200, 1);
+                prog = 1 - Math.pow(2, -10 * prog);
+                const curr = totalTime * prog;
+                
+                const totalMins = Math.floor(curr);
+                const secs = Math.round((curr - totalMins) * 60);
+                
+                if (totalMins >= 60) {
+                    const hrs = Math.floor(totalMins / 60);
+                    const mins = totalMins % 60;
+                    obj.innerHTML = `${hrs}h ${mins}m ${secs}s`;
+                } else {
+                    obj.innerHTML = `${totalMins}m ${secs}s`;
+                }
+                
+                if(prog < 1) window.requestAnimationFrame(step);
+            };
+            window.requestAnimationFrame(step);
+        }
+
+        function drawChart(tInit, tEnv, tTarget, k, timeReq, mode) {
+            const ctx = document.getElementById('coolingChart').getContext('2d');
+            const timeLabels = [], tempValues = [], ambValues = [], tgtValues = [];
+            const max = timeReq > 0 ? Math.max(timeReq * 1.25, 10) : 50;
+            
+            let targetIdx = -1;
+            let minDiff = Infinity;
+            let idx = 0;
+
+            for (let t = 0; t <= max; t += max/50) {
+                timeLabels.push(t.toFixed(1));
+                tempValues.push(calcTemp(tInit, tEnv, k, t));
+                ambValues.push(tEnv); tgtValues.push(tTarget);
+                
+                let diff = Math.abs(t - timeReq);
+                if(diff < minDiff) { minDiff = diff; targetIdx = idx; }
+                idx++;
+            }
+
+            const pulseData = new Array(timeLabels.length).fill(null);
+            if(targetIdx !== -1 && timeReq > 0) pulseData[targetIdx] = tTarget;
+
+            if (simulationChart) simulationChart.destroy();
+
+            const cColor = mode === 'cold' ? '#00d2ff' : '#ff4757';
+            const cBg = mode === 'cold' ? 'rgba(0, 210, 255, 0.15)' : 'rgba(255, 71, 87, 0.1)';
+            const tColor = mode === 'cold' ? '#ff9f43' : '#feca57';
+
+            simulationChart = new Chart(ctx, {
+                type: 'line',
+                data: {
+                    labels: timeLabels,
+                    datasets: [
+                        { label: `Object Temp (${currentUnit === 'C' ? '°C' : 'K'})`, data: tempValues, borderColor: cColor, backgroundColor: cBg, borderWidth: 4, pointRadius: 0, fill: true, tension: 0.4 },
+                        { label: 'Ambient', data: ambValues, borderColor: mode==='cold'?'#ff4757':'#1e3c72', borderDash:[6,6], borderWidth: 2, pointRadius:0 },
+                        { label: 'Target', data: tgtValues, borderColor: '#2ed573', borderDash:[3,3], borderWidth: 2, pointRadius:0 },
+                        { label: 'Time Drop', data: pulseData, type: 'bar', backgroundColor: 'rgba(47, 53, 66, 0.3)', barThickness: 2 },
+                        { label: '🎯 Target Reached', data: pulseData, borderColor: '#ffffff', borderWidth: 3, backgroundColor: tColor, showLine: false, type: 'line', pointRadius: 8, pointBorderColor: '#fff', pointHoverRadius: 15 }
+                    ]
+                },
+                options: {
+                    responsive: true, maintainAspectRatio: false,
+                    animations: {
+                        radius: { duration: 600, easing: 'easeInOutSine', loop: true, from: 6, to: 12 }
+                    },
+                    animation: { duration: 2500, easing: 'easeOutElastic' },
+                    plugins: { tooltip: { mode: 'index', intersect: false } },
+                    scales: {
+                        x: { title: { display: true, text: 'Time (Minutes)', font: {weight: 'bold'} }, ticks: { maxTicksLimit: 6 } },
+                        y: { title: { display: true, text: `Temp (${currentUnit === 'C' ? '°C' : 'K'})`, font: {weight: 'bold'} }, suggestedMin: Math.min(tInit, tEnv) - 5, suggestedMax: Math.max(tInit, tEnv) + 5 }
+                    }
+                }
+            });
+        }
+
+        // ---- Dynamic Weather Engine ----
+        async function fetchAmbientTemperature() {
+            const btn = document.getElementById('auto-detect-btn');
+            const inputEnv = document.getElementById('input-env');
+            
+            if (btn) {
+                btn.style.animation = 'bounce 1s infinite linear';
+                btn.style.pointerEvents = 'none';
+            }
+
+            const updateWithCoords = async (lat, lon, cityName = "Your Location") => {
+                try {
+                    const weatherResp = await fetch(`https://api.open-meteo.com/v1/forecast?latitude=${lat}&longitude=${lon}&current_weather=true`);
+                    const weatherData = await weatherResp.json();
+                    if (!weatherData.current_weather) throw new Error("Weather data unavailable");
+
+                    let temp = weatherData.current_weather.temperature;
+                    if (currentUnit === 'K') temp += 273.15;
+                    inputEnv.value = temp.toFixed(1);
+                    
+                    showToast(`📍 Detected: ${cityName} (${temp.toFixed(1)}°${currentUnit})`, 'success', '🌍');
+                    if (document.getElementById('screen-simulator').classList.contains('active')) {
+                        document.getElementById('calc-btn').click();
+                    }
+                } catch (e) {
+                    throw e;
+                }
+            };
+
+            // Strategy 1: Browser Geolocation (More accurate, but needs permission)
+            if (navigator.geolocation) {
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        await updateWithCoords(pos.coords.latitude, pos.coords.longitude, "Local Weather");
+                        if (btn) { btn.style.animation = 'none'; btn.style.pointerEvents = 'auto'; }
+                    },
+                    async (err) => {
+                        // Strategy 2: Fallback to IP-based location
+                        try {
+                            const locResp = await fetch('https://ipapi.co/json/');
+                            const locData = await locResp.json();
+                            if (locData.error) throw new Error("IP Lookup failed");
+                            await updateWithCoords(locData.latitude, locData.longitude, locData.city);
+                        } catch (ipErr) {
+                            showToast("Auto-detect info: Run via a local server (like Live Server) for best results.", "warning", "ℹ️");
+                        } finally {
+                            if (btn) { btn.style.animation = 'none'; btn.style.pointerEvents = 'auto'; }
+                        }
+                    },
+                    { timeout: 5000 }
+                );
+            } else {
+                // ... same fallback ...
+            }
+        }
+
+        // Auto-fetch on initial load
+        window.addEventListener('load', () => {
+            setTimeout(fetchAmbientTemperature, 1000); // Small delay for polish
+        });
+
+        document.getElementById('connect-btn').addEventListener('click', async (e) => {
+            playClickSound();
+            const btn = e.target;
+            const outDiv = document.getElementById('demo-output');
+
+            outDiv.style.display = 'none'; setTimeout(() => outDiv.style.display = 'block', 10);
+
+            try {
+                const port = await navigator.serial.requestPort();
+                await port.open({ baudRate: 9600 });
+                
+                btn.innerHTML = "✅ Arduino Linked!";
+                btn.style.background = "linear-gradient(135deg, #2ed573, #7bed9f)";
+                
+                outDiv.style.borderLeftColor = '#2ed573';
+                outDiv.innerHTML = `
+                    <strong style="color: #2ed573;">📡 Arduino Connected</strong><br><br>
+                    <span style="color: #2f3542;">Listening to serial port for live temperature data streams...</span><br>
+                    <span style="font-size:0.8em; color:grey;">(Requires external data string mapping)</span>
+                `;
+                
+                const textDecoder = new window.TextDecoderStream();
+                const readableStreamClosed = port.readable.pipeTo(textDecoder.writable);
+                const reader = textDecoder.readable.getReader();
+
+                while (true) {
+                    const { value, done } = await reader.read();
+                    if (done) break;
+                    if (value) console.log("Arduino Serial Data:", value);
+                }
+            } catch (error) {
+                console.error('Serial Connection Error:', error);
+                btn.innerHTML = "🔌 Connect Arduino Port";
+                
+                outDiv.style.borderLeftColor = '#ff4757';
+                if (error.name === 'NotFoundError') {
+                    outDiv.innerHTML = '<strong style="color:#ff4757;">⚠️ No Port Selected</strong><br>You aborted the connection popup.';
+                } else if (error.name === 'SecurityError') {
+                    outDiv.innerHTML = '<strong style="color:#ff4757;">⚠️ Security Denied</strong><br>Permission to access the Arduino was denied.';
+                } else if (!navigator.serial) {
+                    outDiv.innerHTML = '<strong style="color:#ff4757;">⚠️ API Unsupported</strong><br>Web Serial API is not supported in this browser. Please try Chrome or Edge.';
+                } else {
+                    outDiv.innerHTML = `<strong style="color:#ff4757;">⚠️ Connection Failed</strong><br>${error.message}`;
+                }
+            }
+        });
+    </script>
+</body>
+</html>
