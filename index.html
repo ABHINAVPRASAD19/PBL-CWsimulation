@@ -164,19 +164,42 @@
         summary { font-weight: 800; cursor: pointer; color: #2f3542; user-select: none; }
         .math-breakdown { margin-top: 12px; font-family: monospace; font-size: 0.95em; line-height: 1.6; color: #57606f; }
 
-        /* Side Drawer Styles */
+        /* Enhanced Side Drawer Styles */
         .side-drawer {
             position: fixed; top: 0; right: -450px; width: 400px; height: 100vh;
-            background: rgba(255, 255, 255, 0.95); backdrop-filter: blur(30px); -webkit-backdrop-filter: blur(30px);
+            background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(40px); -webkit-backdrop-filter: blur(40px);
             border-left: 1px solid var(--glass-border); z-index: 1000;
-            transition: right 0.4s cubic-bezier(0.16, 1, 0.3, 1);
-            padding: 40px; box-sizing: border-box; box-shadow: -15px 0 35px rgba(0,0,0,0.15);
+            transition: right 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+            padding: 0; box-sizing: border-box; box-shadow: -20px 0 50px rgba(0,0,0,0.2);
+            display: flex; flex-direction: column;
         }
         .side-drawer.open { right: 0; }
-        .drawer-close { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--text-dark); transition: transform 0.2s; }
-        .drawer-close:hover { transform: scale(1.1) rotate(90deg); color: #ff4757; }
-        .drawer-overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.3); z-index: 999; display: none; opacity: 0; transition: opacity 0.3s; }
-        .drawer-overlay.active { display: block; opacity: 1; }
+        .drawer-header { padding: 40px 40px 20px; background: linear-gradient(to bottom, rgba(255,255,255,0.5), transparent); }
+        .drawer-content { padding: 0 40px 40px; flex-grow: 1; overflow-y: auto; }
+        .drawer-close { position: absolute; top: 30px; right: 30px; cursor: pointer; font-size: 24px; font-weight: bold; color: var(--text-dark); transition: all 0.3s; z-index: 10; width: 40px; height: 40px; display: flex; align-items: center; justify-content: center; border-radius: 50%; background: rgba(0,0,0,0.05); }
+        .drawer-close:hover { transform: rotate(90deg); background: #ff4757; color: white; }
+        .drawer-overlay { position: fixed; top:0; left:0; width:100vw; height:100vh; background: rgba(0,0,0,0.4); z-index: 999; display: block; visibility: hidden; opacity: 0; transition: all 0.4s; backdrop-filter: blur(4px); }
+        .drawer-overlay.active { visibility: visible; opacity: 1; }
+
+        /* Modern Select Styling */
+        .custom-select-wrapper { position: relative; margin-bottom: 25px; }
+        select#scenario-preset {
+            appearance: none; -webkit-appearance: none;
+            padding: 16px 20px; width: 100%; border: 2px solid rgba(0,0,0,0.08); border-radius: 16px;
+            font-size: 16px; font-family: 'Outfit', sans-serif; background: white;
+            font-weight: 600; color: var(--text-dark); outline:none; transition: all 0.3s; cursor: pointer;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+        }
+        select#scenario-preset:focus { border-color: #1e90ff; box-shadow: 0 0 0 4px rgba(30, 144, 255, 0.1); }
+        .custom-select-wrapper::after { content: '▼'; position: absolute; right: 20px; top: 50%; transform: translateY(-50%); pointer-events: none; font-size: 12px; color: #a4b0be; }
+
+        /* Scenarios Styling */
+        .scenario-box {
+            background: white; padding: 24px; border-radius: 20px; margin-top: 10px;
+            border: 1px solid rgba(0,0,0,0.05); box-shadow: 0 10px 30px rgba(0,0,0,0.03);
+            transition: all 0.3s;
+        }
+        .scenario-box:hover { transform: translateY(-2px); box-shadow: 0 15px 40px rgba(0,0,0,0.06); }
         
         /* Toast Notifications */
         .toast-container { position: fixed; bottom: 30px; left: 50%; transform: translateX(-50%); z-index: 9999; display: flex; flex-direction: column; gap: 10px; width: 350px; }
@@ -205,40 +228,47 @@
     <div id="particles-container"></div>
     <div id="transition-overlay" class="transition-overlay"></div>
 
-    <!-- SIDE DRAWER & TOASTS -->
     <div id="drawer-overlay" class="drawer-overlay"></div>
     <div id="side-drawer" class="side-drawer">
         <div class="drawer-close" onclick="toggleDrawer()">✕</div>
-        <h2 style="margin-top: 0; font-size: 28px;">Real-World Apps</h2>
-        <p style="color: #57606f; font-weight: 500; font-size: 14px; margin-bottom: 25px;">Select a scenario to track optimal temperature thresholds dynamically.</p>
         
-        <div class="mode-toggle" style="margin-bottom: 25px;">
-            <div class="toggle-option active" id="type-food" onclick="setDrawerType('food')">🍔 Drink/Food</div>
-            <div class="toggle-option" id="type-metal" onclick="setDrawerType('metal')">⚙️ Industrial</div>
+        <div class="drawer-header">
+            <h2 style="margin: 0; font-size: 28px; font-weight: 800;">Real-World Apps</h2>
+            <p style="color: #57606f; font-weight: 500; font-size: 14px; margin: 8px 0 0 0;">Dynamic scenario tracking engine.</p>
         </div>
 
-        <div class="control-group">
-            <label><i>📋</i> Scenario Preset</label>
-            <select id="scenario-preset" style="padding: 14px; width: 100%; border: 2px solid rgba(0,0,0,0.1); border-radius: 12px; font-size: 16px; font-family: 'Outfit', sans-serif; background-color: rgba(255,255,255,0.8); font-weight: 600; color: var(--text-dark); outline:none; transition: all 0.3s; cursor: pointer;">
-            </select>
-        </div>
-        
-        <div style="background: rgba(0,0,0,0.03); padding: 20px; border-radius: 16px; margin-top: 30px; border: 1px solid rgba(0,0,0,0.05);">
-            <h3 style="margin-top:0; font-size: 18px; display: flex; align-items: center; gap: 8px;">🎯 Goldilocks Zone</h3>
-            <p id="zone-description" style="font-size: 14px; color: #57606f; margin-bottom: 5px; font-weight: 600;">Optimal Temp: 60°C - 50°C</p>
-            <p style="font-size: 13px; color: #a4b0be; margin-top: 0;">We'll calculate when it enters and exits this zone.</p>
-            
-            <div style="display: flex; gap: 10px; align-items: center; margin-top: 20px; margin-bottom: 10px;">
-                <input type="checkbox" id="fast-forward" checked style="width: 20px; height: 20px; cursor: pointer;">
-                <label for="fast-forward" style="margin-bottom:0; cursor: pointer; font-size: 14px; font-weight: 800;">Accelerate Time for Demo (60x)</label>
+        <div class="drawer-content">
+            <div class="mode-toggle" style="margin-bottom: 25px; margin-top: 10px;">
+                <div class="toggle-option active" id="type-daily" onclick="setDrawerType('daily')">🏠 Daily Use</div>
+                <div class="toggle-option" id="type-metal" onclick="setDrawerType('metal')">⚙️ Industrial</div>
+            </div>
+
+            <div class="control-group">
+                <label><i>📋</i> Scenario Preset</label>
+                <div class="custom-select-wrapper">
+                    <select id="scenario-preset"></select>
+                </div>
             </div>
             
-            <p id="preset-hint" style="font-size: 11px; color: #a4b0be; margin-top: 0; margin-bottom: 15px; cursor: pointer; text-decoration: underline;" onclick="loadManualPresets()">💡 Click to load recommended temperatures for this scenario</p>
-            
-            <button id="start-tracking-btn" class="action-btn" style="background: linear-gradient(135deg, #2f3542, #57606f); margin-top: 5px; margin-bottom: 0;">🚀 Start Live Tracking</button>
+            <div class="scenario-box">
+                <h3 style="margin-top:0; font-size: 18px; display: flex; align-items: center; gap: 10px;">🎯 Goldilocks Zone</h3>
+                <p id="zone-description" style="font-size: 15px; color: #2f3542; margin-bottom: 8px; font-weight: 700; background: rgba(46, 213, 115, 0.1); padding: 10px 15px; border-radius: 10px; display: inline-block;">Optimal Temp: --</p>
+                <p style="font-size: 13px; color: #a4b0be; margin-top: 5px; font-weight: 500;">We'll calculate the precise window for this scenario.</p>
+                
+                <div style="display: flex; gap: 12px; align-items: center; margin-top: 25px; margin-bottom: 20px; background: rgba(0,0,0,0.03); padding: 12px; border-radius: 12px;">
+                    <input type="checkbox" id="fast-forward" checked style="width: 20px; height: 20px; cursor: pointer;">
+                    <label for="fast-forward" style="margin-bottom:0; cursor: pointer; font-size: 13px; font-weight: 700; color: #57606f;">Accelerate Time (60x Demo)</label>
+                </div>
+                
+                <button onclick="loadManualPresets()" class="action-btn" style="background: white; color: #1e90ff; border: 2px solid #1e90ff; box-shadow: none; font-size: 14px; padding: 14px; margin-bottom: 15px;">📥 Load Scenario Values</button>
+                
+                <button id="start-tracking-btn" class="action-btn" style="background: linear-gradient(135deg, #2f3542, #57606f); margin-top: 0; margin-bottom: 0;">🚀 Start Live Tracking</button>
+            </div>
         </div>
     </div>
     <div id="stopwatch-container" class="sw-widget">
+        <div class="drawer-close" onclick="minimizeStopwatch()" style="top: 5px; right: 40px; width: 30px; height: 30px; font-size: 14px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">−</div>
+        <div class="drawer-close" onclick="cancelStopwatch()" style="top: 5px; right: 5px; width: 30px; height: 30px; font-size: 14px; background: rgba(0,0,0,0.2); border: 1px solid rgba(255,255,255,0.1); color: white; display: flex; align-items: center; justify-content: center; font-weight: bold;">✕</div>
         <div class="sw-glass-bg"></div>
         <svg viewBox="0 0 100 115" class="sw-svg">
             <rect x="42" y="2" width="16" height="3" rx="1.5" fill="currentColor"/>
@@ -290,8 +320,9 @@
                 </div>
             </div>
         </div>
-        <div class="top-right-controls" style="position: absolute; top: 40px; right: 40px; z-index: 100;">
-            <div class="back-btn" onclick="toggleDrawer()" style="background: #2f3542; color: white;">☰ More</div>
+        <div class="top-right-controls" style="position: absolute; top: 40px; right: 40px; z-index: 100; display: flex; gap: 10px; align-items: center;">
+            <div id="minimized-clock" onclick="restoreStopwatch()" style="display: none; width: 45px; height: 45px; background: #2f3542; color: #2ed573; border-radius: 50%; justify-content: center; align-items: center; cursor: pointer; box-shadow: 0 0 15px rgba(46, 213, 115, 0.4); border: 2px solid #2ed573; animation: pulse 2s infinite;">⏱️</div>
+            <div class="back-btn" onclick="toggleDrawer()" style="background: #2f3542; color: white; margin: 0;">☰ More</div>
         </div>
         
         <div class="dashboard">
@@ -398,6 +429,20 @@
             playNote(783.99, 0.2); // G5
         }
 
+        function playAlertSound() {
+            if(audioCtx.state === 'suspended') audioCtx.resume();
+            const playBeep = (delay) => {
+                const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain();
+                osc.type = 'sine'; osc.frequency.value = 880; 
+                gain.gain.setValueAtTime(0, audioCtx.currentTime + delay);
+                gain.gain.linearRampToValueAtTime(0.3, audioCtx.currentTime + delay + 0.02);
+                gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + delay + 0.15);
+                osc.connect(gain); gain.connect(audioCtx.destination);
+                osc.start(audioCtx.currentTime + delay); osc.stop(audioCtx.currentTime + delay + 0.2);
+            };
+            playBeep(0); playBeep(0.2);
+        }
+
         // ---- Toast & Drawer Logic ----
         function showToast(msg, type='success', icon='✅') {
             const container = document.getElementById('toast-container');
@@ -438,32 +483,35 @@
             } else {
                 drw.classList.add('open');
                 ovr.classList.add('active');
-                setDrawerType(document.getElementById('type-food').classList.contains('active') ? 'food' : 'metal');
+                // Only populate, don't overwrite current state immediately
+                populateDrawer(document.getElementById('type-daily').classList.contains('active') ? 'daily' : 'metal');
             }
         }
         document.getElementById('drawer-overlay').addEventListener('click', toggleDrawer);
 
         const scenarios = {
             'hot': {
-                'food': [
-                    { id: 'coffee', name: '☕ Hot Coffee Tracking', tInit: 90, tEnv: 22, k: 0.04, minT: 50, maxT: 60, desc: 'Optimal Drinking Range: 60°C to 50°C' },
-                    { id: 'water', name: '💧 Boiling Water Cooling', tInit: 100, tEnv: 22, k: 0.05, minT: 30, maxT: 40, desc: 'Safe Handling Range: 40°C to 30°C' },
-                    { id: 'tea', name: '🍵 Herbal Tea Steeping', tInit: 95, tEnv: 22, k: 0.035, minT: 65, maxT: 75, desc: 'Flavor Zone: 75°C to 65°C' }
+                'daily': [
+                    { id: 'coffee', name: '☕ Premium Coffee Sip', tInit: 90, tEnv: 22, k: 0.04, minT: 50, maxT: 60, desc: 'Optimal: 60°C - 50°C' },
+                    { id: 'shower', name: '🚿 Perfect Shower Water', tInit: 60, tEnv: 25, k: 0.03, minT: 37, maxT: 40, desc: 'Optimal: 40°C - 37°C' }
                 ],
                 'metal': [
-                    { id: 'steel', name: '⚒️ Steel Quenching', tInit: 900, tEnv: 25, k: 0.15, minT: 50, maxT: 100, desc: 'Safe Touch Handling: 100°C to 50°C' },
-                    { id: 'cpu', name: '💻 CPU Cooling (Air)', tInit: 85, tEnv: 24, k: 0.6, minT: 35, maxT: 45, desc: 'Safe Idle Temps: 45°C to 35°C' }
+                    { id: 'iron', name: '⚒️ Iron Casting', tInit: 1500, tEnv: 30, k: 0.08, minT: 1150, maxT: 1350, desc: 'Ideal Molding: 1350°C - 1150°C' },
+                    { id: 'steel_ind', name: '🏗️ Steel Molding', tInit: 1850, tEnv: 30, k: 0.06, minT: 1500, maxT: 1750, desc: 'Optimal Pour: 1750°C - 1500°C' },
+                    { id: 'gold14', name: '💍 14K Gold Casting', tInit: 1000, tEnv: 25, k: 0.12, minT: 879, maxT: 927, desc: 'Ideal Pour: 927°C - 879°C' },
+                    { id: 'gold18', name: '👑 18K Gold Casting', tInit: 1100, tEnv: 25, k: 0.12, minT: 900, maxT: 950, desc: 'Ideal Pour: 950°C - 900°C' },
+                    { id: 'gold24', name: '🏆 24K Pure Gold', tInit: 1200, tEnv: 25, k: 0.1, minT: 1064, maxT: 1100, desc: 'Optimal Zone: 1100°C - 1064°C' },
+                    { id: 'silver', name: '🥈 Sterling Silver', tInit: 1100, tEnv: 25, k: 0.15, minT: 955, maxT: 1010, desc: 'Ideal Fluidity: 1010°C - 955°C' },
+                    { id: 'copper', name: '🧱 Pure Copper', tInit: 1300, tEnv: 25, k: 0.12, minT: 1150, maxT: 1180, desc: 'Ideal Molding: 1180°C - 1150°C' }
                 ]
             },
             'cold': {
-                'food': [
+                'daily': [
                     { id: 'ice', name: '🧊 Ice Cube Melting', tInit: -15, tEnv: 25, k: 0.04, minT: 0, maxT: -5, desc: 'Keep ice solid (Melts past 0°C)' },
-                    { id: 'popsicle', name: '🍦 Popsicle Thawing', tInit: -18, tEnv: 22, k: 0.03, minT: -2, maxT: -6, desc: 'Perfect frozen bite phase' },
-                    { id: 'meat', name: '🥩 Frozen Meat Defrost', tInit: -18, tEnv: 22, k: 0.02, minT: 0, maxT: -5, desc: 'Safe fridge thaw zone' }
+                    { id: 'popsicle', name: '🍦 Popsicle Thawing', tInit: -18, tEnv: 22, k: 0.03, minT: -2, maxT: -6, desc: 'Perfect frozen bite phase' }
                 ],
                 'metal': [
-                    { id: 'nitrogen', name: '❄️ Liquid N2 Warmed', tInit: -196, tEnv: 25, k: 0.4, minT: -60, maxT: -100, desc: 'Extreme Cold hazard zone' },
-                    { id: 'satellite', name: '🛰️ Satellite Re-entry', tInit: -150, tEnv: 1000, k: 0.08, minT: 0, maxT: -50, desc: 'Frost burn phase' }
+                    { id: 'nitrogen', name: '❄️ Liquid N2 Warmed', tInit: -196, tEnv: 25, k: 0.4, minT: -60, maxT: -100, desc: 'Extreme Cold hazard zone' }
                 ]
             }
         };
@@ -471,10 +519,19 @@
         let currentScenario = null;
         function setDrawerType(type) {
             playClickSound();
-            document.getElementById('type-food').classList.toggle('active', type === 'food');
+            populateDrawer(type);
+        }
+
+        function populateDrawer(type) {
+            currentCategory = type;
+            document.getElementById('type-daily').classList.toggle('active', type === 'daily');
             document.getElementById('type-metal').classList.toggle('active', type === 'metal');
             
+            const speedLabel = document.querySelector('label[for="fast-forward"]');
+            if (speedLabel) speedLabel.innerHTML = `Accelerate Time (${type === 'metal' ? '20x' : '60x'} Demo)`;
+
             const sel = document.getElementById('scenario-preset');
+            const currentVal = sel.value;
             sel.innerHTML = '';
             
             const list = scenarios[currentMode][type];
@@ -483,7 +540,14 @@
                 opt.value = s.id; opt.innerHTML = s.name;
                 sel.appendChild(opt);
             });
-            applyScenario(list[0]);
+            
+            // Re-apply current scenario or first in list to the preview only
+            const toApply = list.find(x => x.id === currentVal) || list[0];
+            if (toApply) {
+                currentScenario = toApply;
+                document.getElementById('zone-description').innerHTML = toApply.desc;
+                sel.value = toApply.id;
+            }
         }
         
         function applyScenario(s) {
@@ -518,24 +582,52 @@
         let stopwatchStartTime = null;
         let phase3FadeoutTimeout = null;
 
-        function startStopwatch(speedFactor, msStart, msEnd) {
+        function cancelStopwatch() {
+            playClickSound();
+            document.getElementById('minimized-clock').style.display = 'none';
+            const container = document.getElementById('stopwatch-container');
+            container.classList.remove('active');
+            setTimeout(() => {
+                container.style.display = 'none';
+                clearInterval(stopwatchInterval);
+                trackingTimers.forEach(t => clearTimeout(t));
+                trackingTimers = [];
+            }, 400);
+        }
+
+        function minimizeStopwatch() {
+            playClickSound();
+            const container = document.getElementById('stopwatch-container');
+            container.classList.remove('active');
+            setTimeout(() => {
+                container.style.display = 'none';
+                document.getElementById('minimized-clock').style.display = 'flex';
+                showToast("Timer minimized to top-right corner.", "success", "📌");
+            }, 400);
+        }
+
+        function restoreStopwatch() {
+            playClickSound();
+            document.getElementById('minimized-clock').style.display = 'none';
+            const container = document.getElementById('stopwatch-container');
+            container.style.display = 'block';
+            void container.offsetWidth; 
+            container.classList.add('active');
+        }
+
+        function startStopwatch(speedFactor, msStart, msEnd, msTarget, msPivot = null) {
             const container = document.getElementById('stopwatch-container');
             const timeDisplay = document.getElementById('stopwatch-time');
             const msDisplay = document.getElementById('stopwatch-ms');
             const progressCircle = document.getElementById('stopwatch-progress');
             
-            const activeColor = currentMode === 'hot' ? '#ff4757' : '#00d2ff';
-            
             container.style.display = 'block';
-            void container.offsetWidth; // Force reflow
+            void container.offsetWidth; 
             container.classList.add('active');
             
             clearInterval(stopwatchInterval);
             stopwatchStartTime = Date.now();
             clearTimeout(phase3FadeoutTimeout);
-            
-            let phase2Triggered = false;
-            let phase3Triggered = false;
             
             stopwatchInterval = setInterval(() => {
                 const now = Date.now();
@@ -544,52 +636,48 @@
                 let displayMs = 0;
                 let progressPct = 0;
 
+                // Handle Dual-Phase Acceleration if Pivot exists
+                const getMappedTime = (elapsed) => {
+                    if (msPivot && elapsed > msPivot) {
+                        return (msPivot * 20) + ((elapsed - msPivot) * 60);
+                    }
+                    return elapsed * speedFactor;
+                };
+
                 if (realElapsed < msStart) {
-                    // PHASE 1: Counting UP to optimal temp (msStart)
-                    container.style.color = activeColor;
-                    displayMs = realElapsed * speedFactor;
+                    container.style.color = '#ff4757';
+                    displayMs = getMappedTime(realElapsed);
                     progressPct = realElapsed / msStart;
-                    progressCircle.style.strokeDashoffset = 257.6 - (257.6 * progressPct);
                 } 
                 else if (realElapsed >= msStart && realElapsed <= msEnd) {
-                    // PHASE 2: Counting DOWN the Goldilocks zone
-                    if (!phase2Triggered) {
-                        phase2Triggered = true;
-                        container.style.transform = 'scale(1.15)'; // Add pop effect
-                        setTimeout(() => container.style.transform = 'scale(1)', 300);
-                    }
-                    container.style.color = '#2ed573'; // Emerald Green
-                    const timeLeft = msEnd - realElapsed;
-                    displayMs = Math.max(0, timeLeft * speedFactor);
-                    progressPct = timeLeft / (msEnd - msStart); // drains from 1 -> 0
-                    progressCircle.style.strokeDashoffset = 257.6 - (257.6 * progressPct);
+                    container.style.color = '#2ed573';
+                    displayMs = getMappedTime(realElapsed);
+                    progressPct = (realElapsed - msStart) / (msEnd - msStart);
                 } 
-                else {
-                    // PHASE 3: Done (Cold/Undrinkable)
-                    clearInterval(stopwatchInterval);
-                    container.style.color = '#a4b0be'; // Grey out
-                    displayMs = 0;
-                    progressCircle.style.strokeDashoffset = 257.6; // Empty
-                    
-                    if (!phase3Triggered) {
-                        phase3Triggered = true;
-                        phase3FadeoutTimeout = setTimeout(() => {
-                            container.classList.remove('active');
-                            setTimeout(() => container.style.display = 'none', 400);
-                        }, 10000);
-                    }
+                else if (realElapsed > msEnd && realElapsed <= msTarget) {
+                    container.style.color = '#ffffff';
+                    displayMs = getMappedTime(realElapsed);
+                    progressPct = (realElapsed - msEnd) / (msTarget - msEnd);
                 }
+                else {
+                    clearInterval(stopwatchInterval);
+                    container.style.color = '#a4b0be';
+                    displayMs = getMappedTime(msTarget);
+                    
+                    phase3FadeoutTimeout = setTimeout(() => {
+                        container.classList.remove('active');
+                        setTimeout(() => container.style.display = 'none', 400);
+                    }, 10000);
+                }
+                
+                progressCircle.style.strokeDashoffset = 257.6 - (257.6 * progressPct);
                 
                 const totalSeconds = displayMs / 1000;
                 const mm = Math.floor(totalSeconds / 60);
                 const ss = Math.floor(totalSeconds % 60);
                 const msStr = Math.floor((displayMs % 1000) / 10).toString().padStart(2, '0');
                 
-                if (mm > 0) {
-                    timeDisplay.innerText = `${mm}:${ss.toString().padStart(2, '0')}`;
-                } else {
-                    timeDisplay.innerText = ss.toString().padStart(2, '0');
-                }
+                timeDisplay.innerText = mm > 0 ? `${mm}:${ss.toString().padStart(2, '0')}` : ss.toString().padStart(2, '0');
                 msDisplay.innerText = `.${msStr}`;
             }, 30);
         }
@@ -597,12 +685,9 @@
         let trackingTimers = [];
         document.getElementById('start-tracking-btn').addEventListener('click', () => {
             if(!currentScenario) return;
-            
-            // Trigger calculation on dashboard
             document.getElementById('calc-btn').click();
-            toggleDrawer(); // close drawer
+            toggleDrawer(); 
             
-            // Clear existing trackers
             trackingTimers.forEach(t => clearTimeout(t)); trackingTimers = [];
             
             const tInit = parseFloat(document.getElementById('input-init').value);
@@ -610,46 +695,76 @@
             const tTargetMan = parseFloat(document.getElementById('input-target').value);
             const k = parseFloat(document.getElementById('input-k').value);
             
-            // Math: Time to reach boundaries (User manual target is the absolute end)
-            // Use scenario's 'maxT' (optimal start) if suitable, otherwise calculate a 20% progress point
-            const delta = Math.abs(tInit - tTargetMan);
-            const tStartIdealVal = currentScenario ? currentScenario.maxT : (tInit - (delta * 0.7)); 
+            // Logic boundaries
+            const maxT = currentScenario.maxT;
+            const minT = currentScenario.minT;
+            const midT = (maxT + minT) / 2;
+            const lostT = currentMode === 'hot' ? minT - 1 : minT + 1;
+
+            const tEntry = calculateTimeForTarget(maxT, tInit, tEnv, k);
+            const tMid = calculateTimeForTarget(midT, tInit, tEnv, k);
+            const tExit = calculateTimeForTarget(minT, tInit, tEnv, k);
+            const tLost = calculateTimeForTarget(lostT, tInit, tEnv, k);
+            const tTarget = calculateTimeForTarget(tTargetMan, tInit, tEnv, k);
             
-            const tStartIdeal = calculateTimeForTarget(tStartIdealVal, tInit, tEnv, k);
-            const tEndIdeal = calculateTimeForTarget(tTargetMan, tInit, tEnv, k);
-            
-            if(tStartIdeal < 0 || tEndIdeal < 0) {
-                showToast("Scenario physically unreachable with current parameters.", "danger", "⚠️");
+            if(tEntry < 0 || tExit < 0 || tTarget < 0) {
+                showToast("Target unreachable with current physics.", "danger", "⚠️");
                 return;
             }
 
-            const speedFactor = document.getElementById('fast-forward').checked ? 60 : 1;
-            const msStart = (tStartIdeal * 60 * 1000) / speedFactor;
-            const msEnd = (tEndIdeal * 60 * 1000) / speedFactor;
-            const msDuration = msEnd - msStart;
+            const isFast = document.getElementById('fast-forward').checked;
+            const useVariableSpeed = isFast && currentCategory === 'metal' && tTargetMan < 200;
 
-            startStopwatch(speedFactor, msStart, msEnd);
-
-            showToast(`Tracking Initiated! Will notify when temperature hits ${tStartIdealVal}°${currentUnit}.`, 'success', '📡');
-
-            trackingTimers.push(setTimeout(() => {
-                showToast(`Optimal Temp Reached (${tStartIdealVal}°${currentUnit})! Target: ${tTargetMan}°${currentUnit}.`, 'success', '✨');
-            }, msStart));
-
-            if (msDuration > 4000) { // Only show midpoint if duration is long enough
-                trackingTimers.push(setTimeout(() => {
-                    showToast(`Hurry up! Temperature is dropping out of optimal range!`, 'warning', '⏳');
-                }, msStart + (msDuration / 2)));
+            let msEntry, msMid, msExit, msLost, msTarget, speedFactor;
+            if (useVariableSpeed) {
+                speedFactor = 20; // Base speed for Phase 1
+                msEntry = (tEntry * 60 * 1000) / 20;
+                msMid = (tMid * 60 * 1000) / 20;
+                msExit = (tExit * 60 * 1000) / 20;
+                msLost = msExit + ((tLost - tExit) * 60 * 1000) / 60;
+                msTarget = msExit + ((tTarget - tExit) * 60 * 1000) / 60;
+                
+                showToast(`Dynamic Acceleration Enabled: 20x (Critical) → 60x (Tail).`, 'success', '⚡');
+            } else {
+                speedFactor = isFast ? (currentCategory === 'metal' ? 20 : 60) : 1;
+                msEntry = (tEntry * 60 * 1000) / speedFactor;
+                msMid = (tMid * 60 * 1000) / speedFactor;
+                msExit = (tExit * 60 * 1000) / speedFactor;
+                msLost = (tLost * 60 * 1000) / speedFactor;
+                msTarget = (tTarget * 60 * 1000) / speedFactor;
+                
+                showToast(`Tracking Initiated! Objective: ${maxT}°${currentUnit}.`, 'success', '📡');
             }
 
+            startStopwatch(speedFactor, msEntry, msExit, msTarget, useVariableSpeed ? msExit : null);
+
+            // Phase 1: Entry
             trackingTimers.push(setTimeout(() => {
-                showToast(`Hurry up, last chance! Nearing ${tTargetMan}°${currentUnit} threshold!`, 'danger', '🔥');
-            }, Math.max(msStart + 1000, msEnd - (10000 / speedFactor)))); // 10 real seconds before end, or at least 1s after start
+                showToast(`Optimal Temp Reached (${maxT}°${currentUnit})!`, 'success', '✨');
+                playSuccessSound();
+            }, msEntry));
+
+            // Phase 2: Midpoint
+            trackingTimers.push(setTimeout(() => {
+                showToast(`Hurry up! Perceiving maximum flavor/comfort at ${midT.toFixed(1)}°${currentUnit}.`, 'warning', '⏳');
+            }, msMid));
+
+            // Phase 3: Exit
+            trackingTimers.push(setTimeout(() => {
+                showToast(`Last chance! Threshold reached at ${minT}°${currentUnit}.`, 'danger', '🔥');
+            }, msExit));
+
+            // Phase 4: Lost
+            trackingTimers.push(setTimeout(() => {
+                showToast(`Optimal temp lost!`, 'danger', '🔇');
+                playAlertSound();
+            }, msLost));
         });
 
         let currentMode = 'hot';
         let entryMode = 'manual';
         let currentUnit = 'C';
+        let currentCategory = 'daily';
         let simulationChart = null;
         let particleInterval = null;
 
@@ -846,26 +961,26 @@
                 panel.style.borderTopColor = '#ff4757';
                 title.innerHTML = '🔥 Heat Sink Simulator';
                 lblInit.innerHTML = `<i>☕</i> Boiling Initial Temp (&#176;${unitStr})`;
-                inInit.value = currentUnit === 'C' ? '90.0' : '363.1';
+                inInit.value = '';
                 document.getElementById('input-env').value = currentUnit === 'C' ? '30.0' : '303.1';
                 inTarget.value = currentUnit === 'C' ? '40.0' : '313.1';
                 
                 btnCalc.style.background = 'linear-gradient(135deg, #ff416c, #ff4b2b)';
                 btnCalc.innerHTML = '🧮 Compute Cooling Duration';
                 
-                drawChart(parseFloat(inInit.value), parseFloat(document.getElementById('input-env').value), parseFloat(inTarget.value), 0.05, 62.42, 'hot');
+                drawChart(90, parseFloat(document.getElementById('input-env').value), 40, 0.05, 62.42, 'hot');
             } else {
                 panel.style.borderTopColor = '#00d2ff';
                 title.innerHTML = '❄️ Defrost Simulator';
                 lblInit.innerHTML = `<i>🧊</i> Frozen Initial Temp (&#176;${unitStr})`;
-                inInit.value = currentUnit === 'C' ? '-10.0' : '263.1';
+                inInit.value = '';
                 document.getElementById('input-env').value = currentUnit === 'C' ? '30.0' : '303.1';
                 inTarget.value = currentUnit === 'C' ? '40.0' : '313.1';
 
                 btnCalc.style.background = 'linear-gradient(135deg, #00d2ff, #3a7bd5)';
                 btnCalc.innerHTML = '🧮 Compute Warming Duration';
                 
-                drawChart(parseFloat(inInit.value), parseFloat(document.getElementById('input-env').value), parseFloat(inTarget.value), 0.05, 36.97, 'cold');
+                drawChart(-10, parseFloat(document.getElementById('input-env').value), 40, 0.05, 36.97, 'cold');
             }
             Chart.defaults.animation = true;
         }
